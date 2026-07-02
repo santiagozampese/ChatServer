@@ -19,26 +19,31 @@ public static class Server
             HttpListenerContext context = await listener.GetContextAsync();
             if (context.Request.IsWebSocketRequest)
             {
-                string? roomName = context.Request.QueryString["room"];
 
                 HttpListenerWebSocketContext wsContext = await context.AcceptWebSocketAsync(null);
 
                 WebSocket socket = wsContext.WebSocket;
 
+                byte[] buffer = new byte[1024 * 4];
+                var roomNameReceived = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                string roomJson = Encoding.UTF8.GetString(buffer, 0, roomNameReceived.Count);
+                var roomObj = JsonConvert.DeserializeObject<Sendable>(roomJson);
+
+                string? roomName = roomObj?.message!.message;
+
                 if (string.IsNullOrEmpty(roomName))
                 {
-                    byte[] buffer = new byte[1024 * 4];
+                    buffer = new byte[1024 * 4];
                     var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                     
                     string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
             
                     Sendable? received = JsonConvert.DeserializeObject<Sendable>(json);
-                    if (received == null) continue;
-
-                    _ = SendRooms(socket, received);
-                    _ = CreateRoom(socket, received);
-
-                    continue;
+                    if (received != null)
+                    {
+                        _ = SendRooms(socket, received);
+                        await CreateRoom(socket, received);       
+                    }
                 }
 
                 lock (_rooms)
@@ -59,7 +64,7 @@ public static class Server
 
                 Console.WriteLine($"New user join in room {roomName}!");
 
-                _ = ClientTratament(socket, roomName);
+                if (roomName != null) _ = ClientTratament(socket, roomName);
             }
             else
             {
@@ -79,6 +84,7 @@ public static class Server
             while (socket.State == WebSocketState.Open)
             {
                 var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+     
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
                     string message = Encoding.UTF8.GetString(buffer, 0, result.Count);
@@ -153,26 +159,14 @@ public static class Server
     {
         try
         {          
-            if (received.request != null && received.request.requestType == "createRoom")
+            if (received.room != null)
             {
-                if (received.room != null)
-                {
-                    _rooms.Add(received.room);
-
-                    byte[] buffer = new byte[1024 * 4];
-                    Sendable sendable = new Sendable() {message=new Message(){message="create"}};
-                    string json = JsonConvert.SerializeObject(sendable);
-                    await socket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
-                }
-            }   
+                _rooms.Add(received.room);
+            }
         }
         catch (Exception e)
         {
             Console.WriteLine($"Error: {e.Message}");
-            byte[] buffer = new byte[1024 * 4];
-            Sendable sendable = new Sendable() {message=new Message(){message="error"}};
-            string json = JsonConvert.SerializeObject(sendable);
-            await socket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
 }
