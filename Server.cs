@@ -47,7 +47,7 @@ public static class Server
                     {
                         if (room.name == roomName)
                         {
-                            if (room.MaxUsers<room.CurrentUsers)
+                            if (room.MaxUsers>room.CurrentUsers)
                             {
                                 room.clients.Add(socket);
                                 room.CurrentUsers++;
