@@ -9,7 +9,7 @@ public static class Server
     {
         string door = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         HttpListener listener = new HttpListener();
-        listener.Prefixes.Add($"http://*:{door}/");
+        listener.Prefixes.Add($"http://+:{door}/");
         listener.Start();
 
         Console.WriteLine($"Room Server running in {door}...");
