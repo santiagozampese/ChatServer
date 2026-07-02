@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 public static class Server
 {   
     private static Dictionary<string, List<WebSocket>> _rooms = new();
-    public static async Task Main(string[] args)
+    public static async Task Start()
     {
         string door = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         HttpListener listener = new HttpListener();
@@ -35,7 +35,7 @@ public static class Server
                     _rooms[roomName].Add(socket);
                 }
 
-                Console.WriteLine($"New user join in room {roomName}");
+                Console.WriteLine($"New user join in room {roomName}!");
 
                 _ = ClientTratament(socket, roomName);
             }
@@ -94,7 +94,7 @@ public static class Server
                     if (_rooms[roomName].Count == 0) _rooms.Remove(roomName);
                 }
             }
-            Console.WriteLine($"User left room {roomName}");
+            Console.WriteLine($"User left room {roomName}!");
         }
     }
 }
