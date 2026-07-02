@@ -151,9 +151,28 @@ public static class Server
 
     public static async Task CreateRoom(WebSocket socket, Sendable received)
     {
-        if (received.request != null && received.request.requestType == "createRoom")
+        try
+        {          
+            if (received.request != null && received.request.requestType == "createRoom")
+            {
+                if (received.room != null)
+                {
+                    _rooms.Add(received.room);
+
+                    byte[] buffer = new byte[1024 * 4];
+                    Sendable sendable = new Sendable() {message=new Message(){message="create"}};
+                    string json = JsonConvert.SerializeObject(sendable);
+                    await socket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+            }   
+        }
+        catch (Exception e)
         {
-            if (received.room != null) _rooms.Add(received.room);
-        }   
+            Console.WriteLine($"Error: {e.Message}");
+            byte[] buffer = new byte[1024 * 4];
+            Sendable sendable = new Sendable() {message=new Message(){message="error"}};
+            string json = JsonConvert.SerializeObject(sendable);
+            await socket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+        }
     }
 }
