@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 
 var builder = WebApplication.CreateBuilder(args);
 string port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"http://0.0.0:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var app = builder.Build();
 app.UseWebSockets();
@@ -24,9 +24,12 @@ app.Map("/ws", async (HttpContext context) =>
 
         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-        _ = ReceiveRequests(webSocket, Rooms);
+        bool completed = await ReceiveRequests(webSocket, Rooms);
 
-        Rooms[room].clients.Add(webSocket);
+        if (!completed)
+        {         
+            Rooms[room].clients.Add(webSocket);
+        }
 
         Console.WriteLine($"Client conncted in room: {room}");
 
@@ -101,6 +104,7 @@ static async Task CreateRoom(WebSocket socket, Room room, ConcurrentDictionary<s
         if (room != null)
         {
             rooms.TryAdd(room?.name!, room!);
+            rooms[room?.name!].clients.Add(socket);
         }
     }
     catch (Exception e)
@@ -109,7 +113,7 @@ static async Task CreateRoom(WebSocket socket, Room room, ConcurrentDictionary<s
     }
 }
 
-static async Task ReceiveRequests(WebSocket socket, ConcurrentDictionary<string, Room> rooms)
+static async Task<bool> ReceiveRequests(WebSocket socket, ConcurrentDictionary<string, Room> rooms)
 {
     try
     {
@@ -119,13 +123,15 @@ static async Task ReceiveRequests(WebSocket socket, ConcurrentDictionary<string,
         string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
         Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
 
-        if (sendable != null && sendable.request!.requestType == "createRoom")
+        if (sendable != null && sendable.message!.message == "createRoom")
         {
             await CreateRoom(socket, sendable?.room!, rooms);
         }
+        return true;
     }
     catch (Exception e)
     {
         Console.WriteLine($"Error to receive: {e.Message}");
+        return false;
     }
 }

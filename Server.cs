@@ -7,7 +7,7 @@ public static class Server
 
     public static async Task SendRooms(WebSocket socket, Sendable received)
     {
-        if (received.request != null && received.request.requestType == "roomList")
+        if (received.message != null && received.message.message == "roomList")
         {
             Sendable sendable = new Sendable
             {
