@@ -20,7 +20,7 @@ app.Map("/ws", async (HttpContext context) =>
     {
         byte[] buffer = new byte[1024 * 4];
 
-        var room = context.Request.Query["room"].ToString() ?? "Default";
+        var room = context.Request.Query["room"].ToString();
 
         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
@@ -28,6 +28,20 @@ app.Map("/ws", async (HttpContext context) =>
 
         if (!completed)
         {         
+            string json = JsonConvert.SerializeObject(Rooms);
+            var send = Encoding.UTF8.GetBytes(json);
+
+            await webSocket.SendAsync(new ArraySegment<byte>(send), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            if (string.IsNullOrEmpty(room))
+            {
+                var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+                json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
+
+                if (sendable != null && sendable.room != null && sendable.room.name != null) room = sendable.room.name;
+            }
+            
             Rooms[room].clients.Add(webSocket);
         }
 
