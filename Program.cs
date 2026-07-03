@@ -24,7 +24,7 @@ app.Map("/ws", async (HttpContext context) =>
 
         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-        bool completed = await ReceiveRequests(webSocket, Rooms);
+        (bool completed, WebSocketReceiveResult? result) = await ReceiveRequests(webSocket, Rooms);
 
         if (!completed)
         {         
@@ -35,11 +35,13 @@ app.Map("/ws", async (HttpContext context) =>
 
             if (string.IsNullOrEmpty(room))
             {
-                var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
-                json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
+                if (result != null)
+                {           
+                    json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
 
-                if (sendable != null && sendable.room != null && sendable.room.name != null) room = sendable.room.name;
+                    if (sendable != null && sendable.room != null && sendable.room.name != null) room = sendable.room.name;
+                }
             }
             
             Rooms[room].clients.Add(webSocket);
@@ -127,12 +129,13 @@ static async Task CreateRoom(WebSocket socket, Room room, ConcurrentDictionary<s
     }
 }
 
-static async Task<bool> ReceiveRequests(WebSocket socket, ConcurrentDictionary<string, Room> rooms)
+static async Task<(bool, WebSocketReceiveResult?)> ReceiveRequests(WebSocket socket, ConcurrentDictionary<string, Room> rooms)
 {
+    WebSocketReceiveResult? result = null;
     try
     {
         byte[] buffer = new byte[1024 * 4];
-        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+        result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
         string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
         Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
@@ -141,11 +144,11 @@ static async Task<bool> ReceiveRequests(WebSocket socket, ConcurrentDictionary<s
         {
             await CreateRoom(socket, sendable?.room!, rooms);
         }
-        return true;
+        return (true, null);
     }
     catch (Exception e)
     {
         Console.WriteLine($"Error to receive: {e.Message}");
-        return false;
+        return (false, result);
     }
 }
