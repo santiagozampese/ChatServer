@@ -1,23 +1,32 @@
 public class Message
 {
-    public string? user {get; set;}
-    public string? color {get; set;}
-    public string? message {get; set;}
+    public string? UserName {get; set;}
+    public string? Color {get; set;}
+    public string? Msg {get; set;}
+
+    public string? toRoom {get; set;}
+
+    public Message(string message, string? user, string? color)
+    {
+        Msg = message;
+        UserName = user;
+        Color = color;
+    }
 
     public string GetFormattedMessage()
     {
-        string message = this.message ?? "";
-        if (!string.IsNullOrEmpty(user))
+        string message = Msg ?? "";
+        if (!string.IsNullOrEmpty(UserName))
         {
             string? name="";
-            if (User.Name==user) name = "You";
-            else name = user;
-            message = $"{color}{name}{ConsoleHelper.ResetColor}: {this.message}";         
+            if (User.Name==UserName) name = "You";
+            else name = UserName;
+            message = $"{Color}{name}{ConsoleHelper.ResetColor}: {Msg}";         
         }
         
         else
         {
-            message = $"{color}{this.message}{ConsoleHelper.ResetColor}";
+            message = $"{Color}{Msg}{ConsoleHelper.ResetColor}";
         }
         return message;
     }
