@@ -28,19 +28,15 @@ public static class Program
 
     public static void Config()
     {
-        
         app!.Map("/ws", async (HttpContext context) =>
         {
             if (context.WebSockets.IsWebSocketRequest)
             {
-                room = context.Request.Query["room"].ToString();
-
                 using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
-
-                if (!string.IsNullOrEmpty(room)) Console.WriteLine($"Client connected in room: {room}");
 
                 await ClientTratament(webSocket);
             }
+            
             else
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -73,7 +69,7 @@ public static class Program
                     {
                         if (sendable.type == "request")
                         {
-                            bool completed = await ReceiveRequests(socket, result, Rooms);
+                            bool completed = await ReceiveRequests(socket, result);
                             canSend = false;
                         }
                     }
@@ -119,14 +115,14 @@ public static class Program
         }
     }
 
-    static async Task CreateRoom(WebSocket socket, Room room, ConcurrentDictionary<string, Room> rooms)
+    static async Task CreateRoom(WebSocket socket, Room room)
     {
         try
         {          
             if (room != null)
             {
-                rooms.TryAdd(room?.name!, room!);
-                rooms[room?.name!].clients.Add(socket);
+                Rooms.TryAdd(room?.name!, room!);
+                Rooms[room?.name!].clients.Add(socket);
             }
         }
         catch (Exception e)
@@ -135,20 +131,18 @@ public static class Program
         }
     }
 
-    static async Task<bool> ReceiveRequests(WebSocket socket, WebSocketReceiveResult receive, ConcurrentDictionary<string, Room> rooms)
+    static async Task<bool> ReceiveRequests(WebSocket socket, WebSocketReceiveResult receive)
     {
-        WebSocketReceiveResult? result = null;
         try
         {
             byte[] buffer = new byte[1024 * 4];
-            result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
-            string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+            string json = Encoding.UTF8.GetString(buffer, 0, receive.Count);
             Sendable? sendable = JsonConvert.DeserializeObject<Sendable>(json);
 
             if (sendable != null && sendable.message!.message == "createRoom")
             {
-                await CreateRoom(socket, sendable?.room!, rooms);
+                await CreateRoom(socket, sendable?.room!);
             }
 
             else if (sendable?.message!.message == "connect")
@@ -158,18 +152,8 @@ public static class Program
 
             else if (sendable?.message!.message == "getRooms")
             {
-                json = JsonConvert.SerializeObject(Rooms);
-                var send = Encoding.UTF8.GetBytes(json);
-
-                await socket.SendAsync(new ArraySegment<byte>(send), WebSocketMessageType.Text, true, CancellationToken.None);
-
-                if (result != null)
-                {           
-                    json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    Sendable? sendableObj = JsonConvert.DeserializeObject<Sendable>(json);
-
-                    if (sendable != null && sendable.room != null && sendable.room.name != null) room = sendable.room.name;
-                }
+                sendable = new() {rooms=Rooms.Values.ToList()};
+                await SendObj(sendable, socket);
             }
             return true;
         }
@@ -178,5 +162,22 @@ public static class Program
             Console.WriteLine($"Error to receive: {e.Message}");
             return false;
         }
+    }
+
+    public static async Task<Sendable?> ReceiveObj(WebSocket webSocket)
+    {
+        byte[] buffer = new byte[1024 * 4];
+        var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+        string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+        return JsonConvert.DeserializeObject<Sendable>(json);
+    }
+    public static async Task SendObj(Sendable sendable, WebSocket webSocket)
+    {
+        byte[] buffer = new byte[1024 * 4];
+        string json = JsonConvert.SerializeObject(sendable);
+        var bytes = Encoding.UTF8.GetBytes(json);
+
+        await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
     }
 }
