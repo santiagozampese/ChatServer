@@ -175,6 +175,20 @@ public static class Program
                 Console.WriteLine($"User connected to {sendable?.room?.name!}!");
             }
 
+            else if (sendable.message.Msg == "exitRoom")
+            {
+                Console.WriteLine($"User exiting {sendable.message.toRoom}...");
+                if (room != null && Rooms.ContainsKey(room!))
+                {               
+                    Rooms[room!].clients.Remove(socket);
+                    if (Rooms[room!].clients.Count<=0 && room != "Default")
+                    {
+                        var roomObj = Rooms[room!];
+                        Rooms.TryRemove(room!, out roomObj);
+                    }
+                }
+            }
+
             else if (sendable.message.Msg == "getRooms")
             {
                 Console.WriteLine("Sending!");
